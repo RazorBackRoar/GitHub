@@ -79,7 +79,7 @@ graph TB
 | pyproject.toml | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
 | .pylintrc (symlinked) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
 | pyrightconfig.json (symlinked) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
-| PORTFOLIO.md (symlinked) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| docs/PORTFOLIO.md (symlinked) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | docs/CHANGELOG.md | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
 | build/dmg-config.json | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
 | build/scripts/build-dmg.sh | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
