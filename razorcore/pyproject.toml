@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "razorcore"
+version = "1.0.0"
+description = "Shared foundation library for RazorBackRoar's macOS Python applications"
+authors = [
+    { name = "RazorBackRoar" }
+]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: MacOS X",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6.0",
+]
+
+[project.optional-dependencies]
+hashing = ["blake3>=0.3.0", "xxhash>=3.0.0"]
+dev = ["pytest>=7.0.0", "ruff>=0.1.0"]
+
+[project.urls]
+Homepage = "https://github.com/RazorBackRoar/razorcore"
+Repository = "https://github.com/RazorBackRoar/razorcore"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["razorcore*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
