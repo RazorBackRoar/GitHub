@@ -32,6 +32,9 @@ dependencies = [
 hashing = ["blake3>=0.3.0", "xxhash>=3.0.0"]
 dev = ["pytest>=7.0.0", "ruff>=0.1.0"]
 
+[project.scripts]
+razorcore = "razorcore.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/RazorBackRoar/razorcore"
 Repository = "https://github.com/RazorBackRoar/razorcore"
@@ -39,6 +42,9 @@ Repository = "https://github.com/RazorBackRoar/razorcore"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["razorcore*"]
+
+[tool.setuptools.package-data]
+razorcore = ["configs/*"]
 
 [tool.ruff]
 line-length = 100

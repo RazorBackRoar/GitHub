@@ -15,6 +15,8 @@ Modules:
     filesystem  - Safe file operations and hashing
     styling     - UI themes and styled widgets
     build       - DMG creation and build utilities
+    configs     - Shared configuration files (pylintrc, pyrightconfig.json)
+    cli         - Command-line tools (razorcore sync-configs, verify, commit-all)
 """
 
 __version__ = "1.0.0"
