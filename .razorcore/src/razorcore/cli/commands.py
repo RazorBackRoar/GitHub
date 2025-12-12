@@ -14,7 +14,7 @@ RED = "\033[0;31m"
 CYAN = "\033[0;36m"
 NC = "\033[0m"  # No Color
 
-# Managed projects
+# Managed projects (note: .razorcore is hidden)
 MANAGED_PROJECTS = [
     "4Charm",
     "Nexus",
@@ -22,7 +22,7 @@ MANAGED_PROJECTS = [
     "PyPixPro",
     "iSort",
     "LibraLog",
-    "razorcore",
+    ".razorcore",
     "czkawka-macos-guide",
 ]
 
@@ -230,11 +230,11 @@ def verify(
     else:
         log_success(".dev-tools directory removed")
 
-    # Check razorcore exists
-    if (workspace / "razorcore").exists():
-        log_success("razorcore directory exists")
+    # Check .razorcore exists
+    if (workspace / ".razorcore").exists():
+        log_success(".razorcore directory exists")
     else:
-        log_error("razorcore directory missing")
+        log_error(".razorcore directory missing")
         errors += 1
 
     # Summary
@@ -575,11 +575,11 @@ def build_project(
         log_info(f"Buildable projects: {', '.join(BUILDABLE_PROJECTS)}")
         return 1
 
-    razorcore_dir = workspace / "razorcore"
+    razorcore_dir = workspace / ".razorcore"
     build_script = razorcore_dir / "universal-build.sh"
 
     if not build_script.exists():
-        log_error("universal-build.sh not found in razorcore/")
+        log_error("universal-build.sh not found in .razorcore/")
         return 1
 
     proj_dir = workspace / project

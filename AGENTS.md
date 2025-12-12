@@ -1,6 +1,6 @@
 # RazorBackRoar GitHub Workspace
 
-This workspace contains 6 macOS Python/PySide6 applications with a shared library called `razorcore`.
+This workspace contains 6 macOS Python/PySide6 applications with a shared library called `.razorcore` (hidden folder).
 
 ## Workspace Structure
 
@@ -9,7 +9,7 @@ This workspace contains 6 macOS Python/PySide6 applications with a shared librar
 ├── AGENTS.md                    # ← You are here (AI reads this)
 ├── .vscode/settings.json        # VS Code workspace settings
 │
-├── razorcore/                   # SHARED LIBRARY - use this first!
+├── .razorcore/                  # SHARED LIBRARY (hidden) - use this first!
 │   ├── pyproject.toml
 │   ├── universal-build.sh      # Build any project
 │   └── src/razorcore/
@@ -53,7 +53,7 @@ This workspace contains 6 macOS Python/PySide6 applications with a shared librar
 | PyPixPro | `pypixpro` | 1.0.0 | Photo organization |
 | iSort | `isort_app` | 10.0.0 | Apple device file organizer |
 | LibraLog | `libralog` | 1.0.0 | Library manager |
-| **razorcore** | `razorcore` | 1.0.0 | Shared library (configs, themes, build tools) |
+| **.razorcore** | `razorcore` | 1.0.0 | Shared library (configs, themes, build tools) |
 
 ---
 
@@ -64,8 +64,8 @@ ALL projects follow this exact structure:
 ```
 ProjectName/
 ├── pyproject.toml           # Package metadata, version, dependencies
-├── .pylintrc                # Linting config (from razorcore)
-├── pyrightconfig.json       # Type checking config (from razorcore)
+├── .pylintrc                # Linting config (from .razorcore)
+├── pyrightconfig.json       # Type checking config (from .razorcore)
 ├── assets/
 │   └── icons/
 │       └── AppName.icns     # Application icon
@@ -88,13 +88,13 @@ ProjectName/
 
 ---
 
-## razorcore - Shared Library
+## .razorcore - Shared Library (Hidden)
 
-Located at `/Users/home/GitHub/razorcore/`
+Located at `/Users/home/GitHub/.razorcore/`
 
 ### Structure
 ```
-razorcore/
+.razorcore/
 ├── pyproject.toml
 ├── universal-build.sh       # Build any project: ./universal-build.sh ProjectName
 └── src/razorcore/
@@ -120,7 +120,7 @@ razorcore/
         └── widgets.py       # NeonButton, StatCard, etc.
 ```
 
-### CLI Commands (after `pip install -e razorcore/`)
+### CLI Commands (after `pip install -e .razorcore/`)
 
 **IMPORTANT FOR AI ASSISTANTS**: When the user asks you to perform these tasks, run these commands in the terminal.
 
@@ -187,7 +187,7 @@ It automatically:
 
 ### Building a Single Project
 ```bash
-cd /Users/home/GitHub/razorcore
+cd /Users/home/GitHub/.razorcore
 ./universal-build.sh 4Charm      # Builds 4Charm
 ./universal-build.sh iSort       # Builds iSort
 ./universal-build.sh --list      # Show all projects
@@ -246,7 +246,7 @@ if __name__ == "__main__":
 
 ## Important Rules
 
-1. **Never use symlinks** - All config files are real files copied from razorcore
+1. **Never use symlinks** - All config files are real files copied from .razorcore
 2. **Version in pyproject.toml only** - Single source of truth for version
 3. **src/ layout required** - All Python code under `src/package_name/`
 4. **DMG configs in build/** - Not at project root
@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
 ## When Modifying Code
 
-1. Check if the functionality exists in razorcore first
+1. Check if the functionality exists in .razorcore first
 2. Use razorcore imports when available:
    ```python
    from razorcore import BaseWorker, setup_logging, get_version
@@ -271,19 +271,19 @@ if __name__ == "__main__":
 
 ### Add a new feature to an app
 1. Check if similar functionality exists in another project
-2. If it's reusable, consider adding it to razorcore first
+2. If it's reusable, consider adding it to .razorcore first
 3. Use the standard module structure: `core/` for logic, `gui/` for UI
 
 ### Update configs across all projects
 ```bash
 cd /Users/home/GitHub
-pip install -e razorcore/      # Install razorcore CLI (one time)
+pip install -e .razorcore/      # Install razorcore CLI (one time)
 razorcore sync-configs          # Copies configs to all projects
 ```
 
 ### Build and create DMG
 ```bash
-cd /Users/home/GitHub/razorcore
+cd /Users/home/GitHub/.razorcore
 ./universal-build.sh 4Charm     # Replace with project name
 ```
 
@@ -303,7 +303,7 @@ razorcore verify iSort          # Check specific project
 | DMG window wrong size | Check `build/dmg-config.json` has correct window dimensions |
 | Icons not showing | Verify `assets/icons/AppName.icns` exists |
 | Build fails | Run from project root, ensure virtual env has PySide6 |
-| razorcore command not found | Run `pip install -e razorcore/` first |
+| razorcore command not found | Run `pip install -e .razorcore/` first |
 
 ---
 

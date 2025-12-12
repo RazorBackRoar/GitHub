@@ -40,7 +40,7 @@ razorcore build <project>   # Build app and create DMG
 ## Structure
 
 ```
-razorcore/
+.razorcore/
 ├── pyproject.toml
 ├── universal-build.sh
 └── src/razorcore/

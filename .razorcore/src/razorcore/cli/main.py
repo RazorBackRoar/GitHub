@@ -163,9 +163,9 @@ def get_workspace(specified: Optional[Path] = None) -> Path:
     if specified:
         return specified.resolve()
 
-    # Try to find workspace from razorcore location
+    # Try to find workspace from .razorcore location (hidden folder)
     razorcore_dir = Path(__file__).parent.parent.parent.parent.parent
-    if (razorcore_dir / "razorcore").exists():
+    if (razorcore_dir / ".razorcore").exists():
         return razorcore_dir
 
     # Try common locations
@@ -176,7 +176,7 @@ def get_workspace(specified: Optional[Path] = None) -> Path:
         home / "Developer",
         Path.cwd(),
     ]:
-        if candidate.exists() and (candidate / "razorcore").exists():
+        if candidate.exists() and (candidate / ".razorcore").exists():
             return candidate
 
     # Default to current directory
