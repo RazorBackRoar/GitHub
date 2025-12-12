@@ -10,7 +10,16 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from .commands import build_project, bump_version, commit_all, list_projects, sync_configs, verify
+from .commands import (
+    build_project,
+    bump_version,
+    commit_all,
+    list_projects,
+    save_all,
+    save_project,
+    sync_configs,
+    verify,
+)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -27,6 +36,8 @@ Examples:
     razorcore commit-all "Fix bug"      # Commit to all projects
     razorcore bump 4Charm               # Auto-bump version based on commits
     razorcore build iSort               # Build project and create DMG
+    razorcore save 4Charm               # Auto-commit and push with generated message
+    razorcore save                      # Save all projects with changes
     razorcore list                      # List all managed projects
         """
     )
@@ -133,6 +144,17 @@ Examples:
         help="Project to build"
     )
 
+    # save command
+    save_parser = subparsers.add_parser(
+        "save",
+        help="Auto-generate commit message, commit, and push"
+    )
+    save_parser.add_argument(
+        "project",
+        nargs="?",
+        help="Project to save (default: all with changes)"
+    )
+
     return parser
 
 
@@ -211,6 +233,14 @@ def main(args: Optional[List[str]] = None) -> int:
                 workspace=workspace,
                 project=parsed.project
             )
+        elif parsed.command == "save":
+            if parsed.project:
+                return save_project(
+                    workspace=workspace,
+                    project=parsed.project
+                )
+            else:
+                return save_all(workspace=workspace)
         else:
             parser.print_help()
             return 1

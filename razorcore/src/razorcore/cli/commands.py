@@ -581,3 +581,190 @@ def build_project(
     )
 
     return result.returncode
+
+
+def save_project(
+    workspace: Path,
+    project: str
+) -> int:
+    """Auto-generate commit message, commit, and push."""
+    print(f"\n{'=' * 60}")
+    print(f"  Razorcore Save: {project}")
+    print(f"{'=' * 60}\n")
+
+    proj_dir = workspace / project
+    if not proj_dir.exists():
+        log_error(f"Project not found: {project}")
+        return 1
+
+    # Check for changes
+    status_result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True
+    )
+
+    if not status_result.stdout.strip():
+        log_info("No changes to commit")
+        return 0
+
+    # Analyze changes to generate commit message
+    changes = status_result.stdout.strip().split("\n")
+
+    # Categorize changes
+    added = []
+    modified = []
+    deleted = []
+
+    for change in changes:
+        if not change.strip():
+            continue
+        status = change[:2].strip()
+        filename = change[3:].strip()
+
+        if 'A' in status or '?' in status:
+            added.append(filename)
+        elif 'D' in status:
+            deleted.append(filename)
+        else:
+            modified.append(filename)
+
+    # Generate commit message
+    # Check if it's a feature, fix, or general change
+    all_files = added + modified + deleted
+
+    # Detect type based on files changed
+    commit_type = "chore"
+    scope = ""
+
+    for f in all_files:
+        if "test" in f.lower():
+            commit_type = "test"
+            break
+        elif "fix" in f.lower() or "bug" in f.lower():
+            commit_type = "fix"
+            break
+        elif any(x in f.lower() for x in ["feature", "new", "add"]):
+            commit_type = "feat"
+            break
+        elif f.endswith(".py"):
+            # Check diff for clues
+            diff_result = subprocess.run(
+                ["git", "diff", "--cached", f, "--", f],
+                cwd=proj_dir,
+                capture_output=True,
+                text=True
+            )
+            diff_text = diff_result.stdout.lower()
+            if "def " in diff_text and "+" in diff_text:
+                commit_type = "feat"
+            elif "fix" in diff_text or "bug" in diff_text:
+                commit_type = "fix"
+
+    # Determine scope from most common directory
+    dirs = set()
+    for f in all_files:
+        parts = f.split("/")
+        if len(parts) > 1:
+            dirs.add(parts[-2] if parts[-1].endswith(".py") else parts[-1].split(".")[0])
+
+    if len(dirs) == 1:
+        scope = f"({list(dirs)[0]})"
+
+    # Build description
+    if len(added) > 0 and len(modified) == 0 and len(deleted) == 0:
+        desc = f"add {', '.join([f.split('/')[-1] for f in added[:3]])}"
+        if len(added) > 3:
+            desc += f" and {len(added) - 3} more"
+    elif len(deleted) > 0 and len(added) == 0 and len(modified) == 0:
+        desc = f"remove {', '.join([f.split('/')[-1] for f in deleted[:3]])}"
+    elif len(modified) > 0:
+        desc = f"update {', '.join([f.split('/')[-1] for f in modified[:3]])}"
+        if len(modified) > 3:
+            desc += f" and {len(modified) - 3} more"
+    else:
+        desc = f"update {len(all_files)} files"
+
+    commit_msg = f"{commit_type}{scope}: {desc}"
+
+    log_info(f"Generated message: {commit_msg}")
+
+    # Stage all changes
+    subprocess.run(["git", "add", "-A"], cwd=proj_dir)
+
+    # Commit
+    commit_result = subprocess.run(
+        ["git", "commit", "-m", commit_msg],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True
+    )
+
+    if commit_result.returncode != 0:
+        log_error(f"Commit failed: {commit_result.stderr}")
+        return 1
+
+    log_success(f"Committed: {commit_msg}")
+
+    # Push
+    log_info("Pushing to remote...")
+    push_result = subprocess.run(
+        ["git", "push"],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True
+    )
+
+    if push_result.returncode == 0:
+        log_success("Pushed to GitHub")
+    else:
+        log_error(f"Push failed: {push_result.stderr}")
+        return 1
+
+    print(f"\n{'=' * 60}")
+    print(f"  {GREEN}✓ Saved and pushed!{NC}")
+    print(f"{'=' * 60}\n")
+
+    return 0
+
+
+def save_all(workspace: Path) -> int:
+    """Save all projects with changes."""
+    print(f"\n{'=' * 60}")
+    print(f"  Razorcore Save All")
+    print(f"{'=' * 60}\n")
+
+    saved = 0
+    skipped = 0
+    errors = 0
+
+    for name in MANAGED_PROJECTS:
+        proj_dir = workspace / name
+        if not proj_dir.exists():
+            continue
+
+        # Check for changes
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=proj_dir,
+            capture_output=True,
+            text=True
+        )
+
+        if not status_result.stdout.strip():
+            skipped += 1
+            continue
+
+        print(f"\n{CYAN}[{name}]{NC}")
+        result = save_project(workspace, name)
+        if result == 0:
+            saved += 1
+        else:
+            errors += 1
+
+    print(f"\n{'=' * 60}")
+    print(f"  Saved: {saved}, Skipped: {skipped}, Errors: {errors}")
+    print(f"{'=' * 60}\n")
+
+    return 1 if errors > 0 else 0
