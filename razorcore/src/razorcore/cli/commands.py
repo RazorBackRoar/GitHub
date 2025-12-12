@@ -571,13 +571,13 @@ def build_project(
     print(f"\n{'=' * 60}")
     print(f"  Razorcore Build: {project}")
     print(f"{'=' * 60}\n")
-    
+
     # Check if project is buildable
     if project not in BUILDABLE_PROJECTS:
         log_error(f"{project} is not a buildable app (documentation or library project)")
         log_info(f"Buildable projects: {', '.join(BUILDABLE_PROJECTS)}")
         return 1
-    
+
     razorcore_dir = workspace / "razorcore"
     build_script = razorcore_dir / "universal-build.sh"
 

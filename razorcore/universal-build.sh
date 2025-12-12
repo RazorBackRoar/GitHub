@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/opt/homebrew/bin/bash
 # =============================================================================
 # Universal Build Script for RazorBackRoar's macOS Applications
 # =============================================================================
@@ -41,13 +41,13 @@ find_python() {
             return
         fi
     done
-    
+
     # Fallback to python3
     if command -v python3 &> /dev/null; then
         echo "python3"
         return
     fi
-    
+
     echo ""
 }
 
@@ -160,7 +160,7 @@ eject_volume() {
 
 clean_build_artifacts() {
     local project_path="$1"
-    
+
     rm -rf "${project_path}/build/temp" 2>/dev/null || true
     rm -rf "${project_path}/build/dist" 2>/dev/null || true
     rm -rf "${project_path}"/*.egg-info 2>/dev/null || true
@@ -177,37 +177,37 @@ clean_build_artifacts() {
 build_project() {
     local APP_NAME="$1"
     local SKIP_DMG="${2:-false}"
-    
+
     # Validate project
     if [[ ! -v PROJECT_PATHS[$APP_NAME] ]]; then
         print_error "Unknown project: $APP_NAME"
         echo "Available projects: ${!PROJECT_PATHS[*]}"
         exit 1
     fi
-    
+
     local PROJECT_DIR="${WORKSPACE_ROOT}/${PROJECT_PATHS[$APP_NAME]}"
     local PACKAGE_NAME="${PROJECT_PACKAGES[$APP_NAME]}"
     local ICON_PATH="${PROJECT_ICONS[$APP_NAME]:-}"
-    
+
     # Validate project directory
     if [ ! -d "$PROJECT_DIR" ]; then
         print_error "Project directory not found: $PROJECT_DIR"
         exit 1
     fi
-    
+
     # Get version
     local APP_VERSION=$(get_pyproject_version "$PROJECT_DIR")
-    
+
     print_header "Building ${APP_NAME} v${APP_VERSION}"
-    
+
     # Change to project directory
     cd "$PROJECT_DIR"
-    
+
     # Step 1: Eject any mounted volumes
     print_step "1/7" "Checking for mounted volumes..."
     eject_volume "$APP_NAME"
     print_success "No conflicting volumes"
-    
+
     # Step 2: Check Python
     print_step "2/7" "Checking Python environment..."
     if [ -z "$PYTHON_EXE" ]; then
@@ -215,7 +215,7 @@ build_project() {
         exit 1
     fi
     print_success "Using $($PYTHON_EXE --version)"
-    
+
     # Step 3: Install dependencies
     print_step "3/7" "Installing dependencies..."
     if [ -f "requirements.txt" ]; then
@@ -223,7 +223,7 @@ build_project() {
     fi
     "$PYTHON_EXE" -m pip install py2app -q
     print_success "Dependencies installed"
-    
+
     # Step 4: Check icon
     print_step "4/7" "Verifying app icon..."
     if [ -n "$ICON_PATH" ] && [ -f "$ICON_PATH" ]; then
@@ -231,16 +231,16 @@ build_project() {
     else
         print_warning "Icon not found, will use default"
     fi
-    
+
     # Step 5: Clean old builds
     print_step "5/7" "Cleaning build artifacts..."
     clean_build_artifacts "$PROJECT_DIR"
     print_success "Cleanup complete"
-    
+
     # Step 6: Build .app bundle
     print_step "6/7" "Building .app bundle (ARM64)..."
     mkdir -p build/dist
-    
+
     if [ -f "setup.py" ]; then
         "$PYTHON_EXE" setup.py py2app --arch=arm64 2>&1 | tee build/build.log || {
             print_error "Build failed - check build/build.log"
@@ -250,48 +250,48 @@ build_project() {
         print_error "setup.py not found"
         exit 1
     fi
-    
+
     local APP_PATH="build/dist/${APP_NAME}.app"
     if [ ! -d "$APP_PATH" ]; then
         # Try alternative locations
         APP_PATH="dist/${APP_NAME}.app"
     fi
-    
+
     if [ ! -d "$APP_PATH" ]; then
         print_error "App bundle not created"
         exit 1
     fi
     print_success "App bundle created: $APP_PATH"
-    
+
     # Code sign
     echo -e "   ${BLUE}Signing app...${NC}"
     codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_PATH"
     print_success "App signed"
-    
+
     # Step 7: Create DMG
     if [ "$SKIP_DMG" = "false" ]; then
         print_step "7/7" "Creating DMG..."
-        
+
         local DMG_PATH="build/dist/${APP_NAME}.dmg"
         local DMG_STAGING="build/dist/${APP_NAME}_dmg"
         local DMG_TEMP="build/dist/${APP_NAME}_temp.dmg"
-        
+
         rm -f "$DMG_PATH" "$DMG_TEMP"
         rm -rf "$DMG_STAGING"
         mkdir -p "$DMG_STAGING"
-        
+
         cp -R "$APP_PATH" "$DMG_STAGING/"
         ln -s /Applications "$DMG_STAGING/Applications" 2>/dev/null || true
         rm -f "$DMG_STAGING/.DS_Store"
-        
+
         # Create read-write DMG
         hdiutil create -volname "${APP_NAME}" -srcfolder "$DMG_STAGING" -ov -format UDRW "$DMG_TEMP"
-        
+
         # Style the DMG
         echo -e "   ${BLUE}Styling DMG window...${NC}"
         DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "$DMG_TEMP" | egrep '^/dev/' | sed 1q | awk '{print $1}')
         sleep 2
-        
+
         osascript <<EOF
 tell application "Finder"
     tell disk "${APP_NAME}"
@@ -312,28 +312,28 @@ tell application "Finder"
     end tell
 end tell
 EOF
-        
+
         hdiutil detach "$DEVICE" -force
         hdiutil convert "$DMG_TEMP" -format UDZO -o "$DMG_PATH"
-        
+
         rm -f "$DMG_TEMP"
         rm -rf "$DMG_STAGING"
-        
+
         local DMG_SIZE=$(du -sh "$DMG_PATH" | cut -f1)
         print_success "DMG created: $DMG_PATH ($DMG_SIZE)"
     else
         print_step "7/7" "Skipping DMG creation"
     fi
-    
+
     # Cleanup
     rm -rf "$APP_PATH" build/temp "${PROJECT_DIR}"/*.egg-info "${PROJECT_DIR}/src"/*.egg-info 2>/dev/null || true
-    
+
     # Final summary
     echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}  ✅ Build Complete: ${APP_NAME} v${APP_VERSION}${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
+
     if [ "$SKIP_DMG" = "false" ]; then
         echo -e "\n${CYAN}📀 To install:${NC} open 'build/dist/${APP_NAME}.dmg'"
     fi
@@ -349,11 +349,11 @@ main() {
         show_help
         exit 0
     fi
-    
+
     local PROJECT=""
     local SKIP_DMG="false"
     local CLEAN_ONLY="false"
-    
+
     while [ $# -gt 0 ]; do
         case "$1" in
             --help|-h)
@@ -381,13 +381,13 @@ main() {
                 ;;
         esac
     done
-    
+
     if [ -z "$PROJECT" ]; then
         print_error "No project specified"
         show_help
         exit 1
     fi
-    
+
     if [ "$CLEAN_ONLY" = "true" ]; then
         local PROJECT_DIR="${WORKSPACE_ROOT}/${PROJECT_PATHS[$PROJECT]:-$PROJECT}"
         if [ -d "$PROJECT_DIR" ]; then
@@ -399,7 +399,7 @@ main() {
         fi
         exit 0
     fi
-    
+
     build_project "$PROJECT" "$SKIP_DMG"
 }
 
