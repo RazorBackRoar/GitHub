@@ -17,6 +17,7 @@ This workspace contains 5 macOS Python/PySide6 applications with a shared librar
 │       ├── logging.py          # Unified logging
 │       ├── threading.py        # BaseWorker classes
 │       ├── filesystem.py       # File operations
+│       ├── updates.py          # GitHub update checking
 │       ├── build/dmg.py        # DMG creation
 │       ├── cli/commands.py     # CLI tools
 │       ├── configs/            # Shared pylintrc, pyrightconfig.json
@@ -99,6 +100,7 @@ Located at `/Users/home/GitHub/.razorcore/`
     ├── logging.py           # Unified logging setup
     ├── threading.py         # BaseWorker classes for QThread
     ├── filesystem.py        # File operations and hashing
+    ├── updates.py           # GitHub Releases API update checker
     ├── build/
     │   ├── __init__.py
     │   └── dmg.py           # DMG creation utilities
