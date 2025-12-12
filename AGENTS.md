@@ -129,9 +129,11 @@ razorcore/
 | `razorcore list` | Shows all projects with versions and git status | To see project overview |
 | `razorcore verify` | Checks all projects for correct structure | After making structural changes |
 | `razorcore sync-configs` | Copies pylintrc/pyrightconfig to all projects | After updating shared configs |
-| `razorcore commit-all "msg"` | Commits to all projects with same message | For synchronized updates |
+| `razorcore save` | Auto-generates commit message, commits, pushes | **After any code changes** |
+| `razorcore save <project>` | Same but for specific project | After changing one project |
 | `razorcore bump <project>` | Auto-bumps version based on commits | Before releasing |
 | `razorcore build <project>` | Builds app and creates DMG | To create distributable |
+| `razorcore commit-all "msg"` | Commits to all projects with same message | For synchronized updates |
 
 ### CLI Command Details
 
@@ -152,6 +154,10 @@ razorcore sync-configs --dry-run    # Preview only
 # Commit to all projects
 razorcore commit-all "feat: add feature"    # All projects
 razorcore commit-all "fix: bug" --push      # Commit and push
+
+# Save (auto-generate message, commit, push) - USE THIS AFTER CHANGES
+razorcore save                      # All projects with changes
+razorcore save 4Charm               # Specific project
 
 # Auto-bump version (reads commit messages)
 razorcore bump 4Charm               # Analyzes commits, bumps version
