@@ -26,7 +26,7 @@ NC='\033[0m' # No Color
 # Script directory (where this script lives)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Workspace root (parent of razorcore)
+# Workspace root (parent of .razorcore)
 WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Python executable - prefer 3.13, fall back to 3.12, 3.11, etc.

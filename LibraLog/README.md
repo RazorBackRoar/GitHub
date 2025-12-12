@@ -37,7 +37,7 @@ pip install -e .
 python -m libralog
 
 # Build DMG
-cd ../razorcore && ./universal-build.sh LibraLog
+cd ../.razorcore && ./universal-build.sh LibraLog
 ```
 
 ## License
