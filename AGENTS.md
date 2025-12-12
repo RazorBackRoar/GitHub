@@ -181,23 +181,50 @@ It automatically:
 
 ---
 
-## Build System
+## razorcore as Central Management System
 
-### Building a Single Project
+**razorcore is the single source of truth** for all project management operations. It centralizes:
+
+| Function | Command | Description |
+|----------|---------|-------------|
+| **Build** | `razorcore build <project>` | Builds .app bundle and creates DMG |
+| **DMG Creation** | (included in build) | Consistent window layout, icon positions |
+| **Version Control** | `razorcore save`, `bump` | Auto-commit, push, version bumping |
+| **Structure Validation** | `razorcore verify` | Ensures project compliance |
+| **Config Distribution** | `razorcore sync-configs` | Propagates shared configs |
+
+### Why razorcore?
+
+1. **Single Entry Point**: All operations go through `razorcore` CLI commands
+2. **Consistency**: Identical build process, DMG layout, and versioning across all projects
+3. **No Duplication**: Individual `build.sh` scripts in projects are redundant and should NOT be used
+4. **Centralized Updates**: Changes to build logic only need to be made in one place
+
+### Build System
+
+**IMPORTANT**: Always use `razorcore build`, never individual project build scripts.
+
 ```bash
+# Correct way to build
+razorcore build 4Charm           # Builds 4Charm with DMG
+razorcore build iSort            # Builds iSort with DMG
+
+# Alternative (direct script access, same result)
 cd /Users/home/GitHub/.razorcore
-./universal-build.sh 4Charm      # Builds 4Charm
-./universal-build.sh iSort       # Builds iSort
-./universal-build.sh --list      # Show all projects
+./universal-build.sh 4Charm
+./universal-build.sh --list      # Show all buildable projects
 ```
 
 ### DMG Configuration
-All projects use identical DMG settings in `build/dmg-config.json`:
+
+All projects use identical DMG settings defined in `build/dmg-config.json`:
 - **Window**: 500x320 at position (200, 200)
 - **App icon position**: x=140, y=130
 - **Applications folder**: x=400, y=130
 - **source_app**: `./build/dist/AppName.app`
 - **volume_icon**: `./assets/icons/AppName.icns`
+
+These settings are enforced by `razorcore build` to ensure visual consistency across all installers.
 
 ---
 
@@ -249,6 +276,8 @@ if __name__ == "__main__":
 3. **src/ layout required** - All Python code under `src/package_name/`
 4. **DMG configs in build/** - Not at project root
 5. **Consistent icon positions** - App at 140, Applications at 400
+6. **Use razorcore for builds** - Never use individual project build scripts; always use `razorcore build <project>`
+7. **razorcore manages everything** - Version control, configs, builds, and validation all go through razorcore
 
 ---
 
@@ -281,8 +310,7 @@ razorcore sync-configs          # Copies configs to all projects
 
 ### Build and create DMG
 ```bash
-cd /Users/home/GitHub/.razorcore
-./universal-build.sh 4Charm     # Replace with project name
+razorcore build 4Charm          # Replace with project name
 ```
 
 ### Check project compliance
