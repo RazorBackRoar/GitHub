@@ -518,9 +518,34 @@ def bump_version(
     )
     log_success(f"Created tag v{new_version}")
 
+    # Auto-push commits and tags
+    log_info("Pushing to remote...")
+    push_result = subprocess.run(
+        ["git", "push"],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True
+    )
+    if push_result.returncode == 0:
+        log_success("Pushed commits")
+    else:
+        log_error(f"Push failed: {push_result.stderr}")
+        return 1
+
+    tags_result = subprocess.run(
+        ["git", "push", "--tags"],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True
+    )
+    if tags_result.returncode == 0:
+        log_success("Pushed tags")
+    else:
+        log_error(f"Tag push failed: {tags_result.stderr}")
+        return 1
+
     print(f"\n{'=' * 60}")
-    print(f"  {GREEN}✓ Version bumped to {new_version}{NC}")
-    print(f"  Run 'git push && git push --tags' to publish")
+    print(f"  {GREEN}✓ Version {new_version} released!{NC}")
     print(f"{'=' * 60}\n")
 
     return 0

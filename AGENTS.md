@@ -173,6 +173,7 @@ It automatically:
 1. Updates `pyproject.toml` with new version
 2. Updates `__init__.py` if it has `__version__`
 3. Creates git commit and tag
+4. Pushes commits and tags to GitHub
 
 ---
 
@@ -343,6 +344,5 @@ BREAKING CHANGE: old API removed
 ### Release Process
 
 1. Write commits using conventional format (`feat:`, `fix:`, etc.)
-2. Run `razorcore bump <project>` to auto-bump version
-3. Push: `git push && git push --tags`
-4. Build: `razorcore build <project>`
+2. Run `razorcore bump <project>` - auto bumps, commits, tags, and pushes
+3. Build: `razorcore build <project>`
