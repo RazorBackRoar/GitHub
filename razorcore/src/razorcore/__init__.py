@@ -17,20 +17,28 @@ Modules:
     build       - DMG creation and build utilities
     configs     - Shared configuration files (pylintrc, pyrightconfig.json)
     cli         - Command-line tools (razorcore sync-configs, verify, commit-all)
+    updates     - Update checking via GitHub Releases API
 """
 
 __version__ = "1.0.0"
 __author__ = "RazorBackRoar"
 
 from razorcore.config import ProjectConfig, get_version
-from razorcore.logging import setup_logging, get_logger
-from razorcore.threading import BaseWorker, AsyncTaskWorker
 from razorcore.filesystem import (
-    sanitize_filename,
-    generate_unique_filename,
-    compute_file_hash,
     check_disk_space,
+    compute_file_hash,
     format_file_size,
+    generate_unique_filename,
+    sanitize_filename,
+)
+from razorcore.logging import get_logger, setup_logging
+from razorcore.threading import AsyncTaskWorker, BaseWorker
+from razorcore.updates import (
+    UpdateChecker,
+    UpdateResult,
+    check_for_updates,
+    compare_versions,
+    is_newer_version,
 )
 
 __all__ = [
@@ -49,4 +57,10 @@ __all__ = [
     "compute_file_hash",
     "check_disk_space",
     "format_file_size",
+    # Updates
+    "UpdateChecker",
+    "UpdateResult",
+    "check_for_updates",
+    "compare_versions",
+    "is_newer_version",
 ]

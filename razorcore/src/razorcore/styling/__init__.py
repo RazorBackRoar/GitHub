@@ -3,17 +3,18 @@ razorcore.styling - UI themes and styled widgets.
 """
 
 from razorcore.styling.themes import (
+    DARK_PALETTE,
     Theme,
     ThemeManager,
-    DARK_PALETTE,
-    get_dark_stylesheet,
     apply_dark_theme,
+    get_dark_stylesheet,
 )
 from razorcore.styling.widgets import (
-    NeonButton,
     GlassPanel,
+    NeonButton,
     StatCard,
     StyledProgressBar,
+    UpdateBanner,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "GlassPanel",
     "StatCard",
     "StyledProgressBar",
+    "UpdateBanner",
 ]
