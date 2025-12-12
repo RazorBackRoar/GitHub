@@ -22,6 +22,7 @@ MANAGED_PROJECTS = [
     "PyPixPro",
     "iSort",
     "LibraLog",
+    "razorcore",
     "czkawka-macos-guide",
 ]
 
