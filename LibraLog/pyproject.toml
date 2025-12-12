@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "libralog"
+version = "1.0.0"
+description = "Library Manager for macOS"
+readme = "README.md"
+authors = [
+    { name = "RazorBackRoar" }
+]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: MacOS X",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/RazorBackRoar/LibraLog"
+Repository = "https://github.com/RazorBackRoar/LibraLog"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["libralog*"]
+
+[project.scripts]
+libralog = "libralog.main:main"
+
+[tool.pyright]
+include = ["."]
+exclude = ["**/node_modules", "**/__pycache__", "build", "dist"]
+pythonVersion = "3.10"
+pythonPlatform = "Darwin"
