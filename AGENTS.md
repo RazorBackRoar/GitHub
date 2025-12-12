@@ -127,9 +127,9 @@ Located at `/Users/home/GitHub/.razorcore/`
 | `razorcore list` | Shows all projects with versions and git status | To see project overview |
 | `razorcore verify` | Checks all projects for correct structure | After making structural changes |
 | `razorcore sync-configs` | Copies pylintrc/pyrightconfig to all projects | After updating shared configs |
-| `razorcore save` | Auto-generates commit message, commits, pushes | **After any code changes** |
+| `razorcore save` | Auto-generates commit message, commits, pushes, **auto-bumps version** | **After any code changes** |
 | `razorcore save <project>` | Same but for specific project | After changing one project |
-| `razorcore bump <project>` | Auto-bumps version based on commits | Before releasing |
+| `razorcore bump <project>` | Manual version bump based on commits | For manual version control |
 | `razorcore build <project>` | Builds app and creates DMG | To create distributable |
 | `razorcore commit-all "msg"` | Commits to all projects with same message | For synchronized updates |
 
@@ -166,18 +166,33 @@ razorcore build 4Charm              # Builds and creates DMG
 razorcore build iSort               # Builds and creates DMG
 ```
 
-### How Version Bumping Works
+### How Version Bumping Works (Automatic)
 
-The `razorcore bump` command reads commit messages since the last git tag:
-- Commits starting with `feat:` → bump MINOR (1.0.0 → 1.1.0)
-- Commits starting with `fix:` → bump PATCH (1.0.0 → 1.0.1)
-- Commits containing `BREAKING CHANGE` → bump MAJOR (1.0.0 → 2.0.0)
+**Version bumping is now AUTOMATIC.** When you run `razorcore save`, it:
+1. Commits your changes with an auto-generated message
+2. Pushes to GitHub
+3. **Automatically bumps the version** based on commit type
+4. Updates `pyproject.toml`, `__init__.py`, and `dmg-config.json`
+5. Creates a git tag (e.g., `v5.2.1`)
+6. Pushes the version commit and tags
 
-It automatically:
-1. Updates `pyproject.toml` with new version
-2. Updates `__init__.py` if it has `__version__`
-3. Creates git commit and tag
-4. Pushes commits and tags to GitHub
+**Version bump rules** (based on commit message):
+- `feat:` commits → bump MINOR (1.0.0 → 1.1.0)
+- `fix:` commits → bump PATCH (1.0.0 → 1.0.1)
+- `BREAKING CHANGE` → bump MAJOR (1.0.0 → 2.0.0)
+- `chore:`, `docs:`, `refactor:` → bump PATCH
+
+**Example workflow:**
+```bash
+# Make changes to code...
+razorcore save 4Charm
+# Output:
+#   ✓ Committed: feat(core): add new feature
+#   ✓ Pushed to GitHub
+#   → Version: 5.2.0 → 5.3.0 (minor)
+#   ✓ Created tag v5.3.0
+#   ✓ Pushed version bump and tags
+```
 
 ---
 
@@ -189,7 +204,7 @@ It automatically:
 |----------|---------|-------------|
 | **Build** | `razorcore build <project>` | Builds .app bundle and creates DMG |
 | **DMG Creation** | (included in build) | Consistent window layout, icon positions |
-| **Version Control** | `razorcore save`, `bump` | Auto-commit, push, version bumping |
+| **Version Control** | `razorcore save` | Auto-commit, push, **auto version bumping** |
 | **Structure Validation** | `razorcore verify` | Ensures project compliance |
 | **Config Distribution** | `razorcore sync-configs` | Propagates shared configs |
 

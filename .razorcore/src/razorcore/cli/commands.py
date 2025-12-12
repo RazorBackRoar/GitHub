@@ -595,11 +595,161 @@ def build_project(
     return result.returncode
 
 
-def save_project(
+def auto_bump_version(
     workspace: Path,
     project: str
 ) -> int:
-    """Auto-generate commit message, commit, and push."""
+    """
+    Automatically bump version based on commit messages (silent version).
+    Called by save_project after a successful commit.
+    Returns 0 on success, 1 if no bump needed or error.
+    """
+    proj_dir = workspace / project
+    pyproject = proj_dir / "pyproject.toml"
+
+    if not pyproject.exists():
+        return 1
+
+    # Get current version
+    try:
+        import tomllib
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+            current_version = data.get("project", {}).get("version", "0.0.0")
+    except Exception:
+        return 1
+
+    # Get commits since last tag
+    result = subprocess.run(
+        ["git", "describe", "--tags", "--abbrev=0"],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode == 0:
+        last_tag = result.stdout.strip()
+        commit_range = f"{last_tag}..HEAD"
+    else:
+        # No tags yet, analyze last commit only
+        commit_range = "-1"
+
+    # Get commit messages
+    if commit_range == "-1":
+        result = subprocess.run(
+            ["git", "log", "-1", "--pretty=format:%s"],
+            cwd=proj_dir,
+            capture_output=True,
+            text=True
+        )
+    else:
+        result = subprocess.run(
+            ["git", "log", commit_range, "--pretty=format:%s"],
+            cwd=proj_dir,
+            capture_output=True,
+            text=True
+        )
+
+    commits = result.stdout.strip().split("\n") if result.stdout.strip() else []
+
+    if not commits or commits == [""]:
+        return 1  # No commits to analyze
+
+    # Determine bump type from the most recent commit
+    bump_type = "patch"  # default
+
+    for commit in commits:
+        commit_lower = commit.lower()
+        if "breaking change" in commit_lower or commit.startswith("!"):
+            bump_type = "major"
+            break
+        elif commit.startswith("feat:") or commit.startswith("feat("):
+            if bump_type != "major":
+                bump_type = "minor"
+
+    # Parse and bump version
+    parts = current_version.split(".")
+    if len(parts) != 3:
+        return 1
+
+    try:
+        major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return 1
+
+    if bump_type == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == "minor":
+        minor += 1
+        patch = 0
+    else:
+        patch += 1
+
+    new_version = f"{major}.{minor}.{patch}"
+
+    log_info(f"Version: {current_version} → {new_version} ({bump_type})")
+
+    # Update pyproject.toml
+    content = pyproject.read_text()
+    updated = content.replace(
+        f'version = "{current_version}"',
+        f'version = "{new_version}"'
+    )
+    pyproject.write_text(updated)
+
+    # Also update __init__.py if it has __version__
+    for init_file in proj_dir.glob("src/*/__init__.py"):
+        init_content = init_file.read_text()
+        if "__version__" in init_content:
+            updated_init = init_content.replace(
+                f'__version__ = "{current_version}"',
+                f'__version__ = "{new_version}"'
+            )
+            init_file.write_text(updated_init)
+
+    # Also update dmg-config.json if it exists
+    dmg_config = proj_dir / "build" / "dmg-config.json"
+    if dmg_config.exists():
+        import json
+        try:
+            with open(dmg_config, "r") as f:
+                dmg_data = json.load(f)
+            dmg_data["version"] = new_version
+            with open(dmg_config, "w") as f:
+                json.dump(dmg_data, f, indent=2)
+        except Exception:
+            pass  # Non-critical, continue
+
+    # Git commit and tag
+    subprocess.run(["git", "add", "-A"], cwd=proj_dir)
+    subprocess.run(
+        ["git", "commit", "-m", f"chore: bump version to {new_version}"],
+        cwd=proj_dir,
+        capture_output=True
+    )
+    subprocess.run(
+        ["git", "tag", "-a", f"v{new_version}", "-m", f"Release {new_version}"],
+        cwd=proj_dir,
+        capture_output=True
+    )
+    log_success(f"Created tag v{new_version}")
+
+    # Push commits and tags
+    subprocess.run(["git", "push"], cwd=proj_dir, capture_output=True)
+    subprocess.run(["git", "push", "--tags"], cwd=proj_dir, capture_output=True)
+    log_success("Pushed version bump and tags")
+
+    return 0
+
+
+def save_project(
+    workspace: Path,
+    project: str,
+    auto_bump: bool = True
+) -> int:
+    """Auto-generate commit message, commit, push, and auto-bump version."""
     print(f"\n{'=' * 60}")
     print(f"  Razorcore Save: {project}")
     print(f"{'=' * 60}\n")
@@ -733,6 +883,14 @@ def save_project(
     else:
         log_error(f"Push failed: {push_result.stderr}")
         return 1
+
+    # Auto-bump version if enabled and project has pyproject.toml
+    pyproject = proj_dir / "pyproject.toml"
+    if auto_bump and pyproject.exists():
+        log_info("Auto-bumping version...")
+        bump_result = auto_bump_version(workspace, project)
+        if bump_result != 0:
+            log_warning("Version bump skipped (no commits since last tag or error)")
 
     print(f"\n{'=' * 60}")
     print(f"  {GREEN}✓ Saved and pushed!{NC}")
