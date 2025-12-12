@@ -1,11 +1,11 @@
 """
 Razorcore CLI Commands Implementation.
 """
+from __future__ import annotations
 
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Optional
 
 # ANSI colors
 GREEN = "\033[0;32m"
@@ -51,7 +51,7 @@ def log_info(msg: str) -> None:
     print(f"{CYAN}→{NC} {msg}")
 
 
-def get_projects(workspace: Path, specified: Optional[List[str]] = None) -> List[Path]:
+def get_projects(workspace: Path, specified: list[str] | None = None) -> list[Path]:
     """Get list of project directories to operate on."""
     if specified:
         projects = []
@@ -82,12 +82,12 @@ def get_config_files() -> dict[str, Path]:
 
 def sync_configs(
     workspace: Path,
-    projects: Optional[List[str]] = None,
+    projects: list[str] | None = None,
     dry_run: bool = False
 ) -> int:
     """Sync shared configuration files to projects."""
     print(f"\n{'=' * 60}")
-    print(f"  Razorcore Config Sync")
+    print("  Razorcore Config Sync")
     print(f"{'=' * 60}\n")
 
     config_files = get_config_files()
@@ -144,12 +144,12 @@ def sync_configs(
 
 def verify(
     workspace: Path,
-    projects: Optional[List[str]] = None,
+    projects: list[str] | None = None,
     strict: bool = False
 ) -> int:
     """Verify project structure and compliance."""
     print(f"\n{'=' * 60}")
-    print(f"  Razorcore Project Verification")
+    print("  Razorcore Project Verification")
     print(f"{'=' * 60}\n")
 
     project_dirs = get_projects(workspace, projects)
@@ -254,12 +254,12 @@ def verify(
 def commit_all(
     workspace: Path,
     message: str,
-    projects: Optional[List[str]] = None,
+    projects: list[str] | None = None,
     push: bool = False
 ) -> int:
     """Commit changes across all projects."""
     print(f"\n{'=' * 60}")
-    print(f"  Razorcore Multi-Project Commit")
+    print("  Razorcore Multi-Project Commit")
     print(f"{'=' * 60}\n")
 
     project_dirs = get_projects(workspace, projects)
@@ -346,7 +346,7 @@ def commit_all(
 def list_projects(workspace: Path) -> int:
     """List all managed projects and their status."""
     print(f"\n{'=' * 60}")
-    print(f"  Razorcore Managed Projects")
+    print("  Razorcore Managed Projects")
     print(f"  Workspace: {workspace}")
     print(f"{'=' * 60}\n")
 
@@ -744,7 +744,7 @@ def save_project(
 def save_all(workspace: Path) -> int:
     """Save all projects with changes."""
     print(f"\n{'=' * 60}")
-    print(f"  Razorcore Save All")
+    print("  Razorcore Save All")
     print(f"{'=' * 60}\n")
 
     saved = 0
