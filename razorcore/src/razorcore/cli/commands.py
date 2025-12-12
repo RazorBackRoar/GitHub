@@ -214,10 +214,7 @@ def verify(
             errors += 1
 
         # Check LICENSE exists
-        has_license = (
-            (proj_dir / "LICENSE").exists() or
-            (proj_dir / "LICENSE.txt").exists()
-        )
+        has_license = (proj_dir / "LICENSE").exists()
         if has_license:
             log_success("LICENSE exists")
         else:
