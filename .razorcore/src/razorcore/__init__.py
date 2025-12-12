@@ -1,5 +1,4 @@
-"""
-razorcore - Shared foundation library for RazorBackRoar's macOS Python applications.
+"""razorcore - Shared foundation library for RazorBackRoar's macOS Python applications.
 
 This package provides common utilities, UI components, and build tools used across:
 - 4Charm (4chan media downloader)
@@ -18,11 +17,22 @@ Modules:
     configs     - Shared configuration files (pylintrc, pyrightconfig.json)
     cli         - Command-line tools (razorcore sync-configs, verify, commit-all)
     updates     - Update checking via GitHub Releases API
+    appinfo     - Standardized app metadata, license display, About dialog
 """
 
 __version__ = "1.0.0"
 __author__ = "RazorBackRoar"
+__license__ = "2025 RazorBackRoar"
 
+from razorcore.appinfo import (
+    LICENSE_TEXT,
+    AboutDialog,
+    AppInfo,
+    AppInfoStatusWidget,
+    AppMetadata,
+    SpaceBarAboutMixin,
+    print_startup_info,
+)
 from razorcore.config import ProjectConfig, get_version
 from razorcore.filesystem import (
     check_disk_space,
@@ -63,4 +73,12 @@ __all__ = [
     "check_for_updates",
     "compare_versions",
     "is_newer_version",
+    # App Info
+    "AppInfo",
+    "AppMetadata",
+    "AboutDialog",
+    "SpaceBarAboutMixin",
+    "AppInfoStatusWidget",
+    "print_startup_info",
+    "LICENSE_TEXT",
 ]

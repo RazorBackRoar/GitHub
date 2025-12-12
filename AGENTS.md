@@ -97,6 +97,7 @@ Located at `/Users/home/GitHub/.razorcore/`
 └── src/razorcore/
     ├── __init__.py
     ├── config.py            # Version reading from pyproject.toml
+    ├── appinfo.py           # App metadata, license display, About dialog
     ├── logging.py           # Unified logging setup
     ├── threading.py         # BaseWorker classes for QThread
     ├── filesystem.py        # File operations and hashing
@@ -116,6 +117,40 @@ Located at `/Users/home/GitHub/.razorcore/`
         ├── __init__.py
         ├── themes.py        # Dark theme, color palettes
         └── widgets.py       # NeonButton, StatCard, etc.
+```
+
+### Standardized App Information Display
+
+All apps display standardized information using `razorcore.appinfo`:
+
+**License**: All apps display "2025 RazorBackRoar"
+
+**Startup Console Output**:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AppName
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Version:  1.2.0
+  License:  2025 RazorBackRoar
+  Size:     45.2 MB
+  Modified: Dec 12, 2025
+  Arch:     ARM64 (Apple Silicon)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Usage in apps**:
+```python
+from razorcore import print_startup_info, AboutDialog, SpaceBarAboutMixin
+
+# Print info on startup
+def main():
+    print_startup_info("MyApp")
+    app = QApplication(sys.argv)
+    ...
+
+# Show About dialog on space bar
+class MainWindow(SpaceBarAboutMixin, QMainWindow):
+    APP_NAME = "MyApp"
 ```
 
 ### CLI Commands (after `pip install -e .razorcore/`)
@@ -205,6 +240,7 @@ razorcore save 4Charm
 | **Build** | `razorcore build <project>` | Builds .app bundle and creates DMG |
 | **DMG Creation** | (included in build) | Consistent window layout, icon positions |
 | **Version Control** | `razorcore save` | Auto-commit, push, **auto version bumping** |
+| **App Info Display** | `print_startup_info()` | Standardized version, license, size display |
 | **Structure Validation** | `razorcore verify` | Ensures project compliance |
 | **Config Distribution** | `razorcore sync-configs` | Propagates shared configs |
 
