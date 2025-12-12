@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from .commands import sync_configs, verify, commit_all, list_projects
+from .commands import build_project, bump_version, commit_all, list_projects, sync_configs, verify
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -25,25 +25,27 @@ Examples:
     razorcore sync-configs 4Charm       # Sync configs to specific project
     razorcore verify                    # Verify all projects
     razorcore commit-all "Fix bug"      # Commit to all projects
+    razorcore bump 4Charm               # Auto-bump version based on commits
+    razorcore build iSort               # Build project and create DMG
     razorcore list                      # List all managed projects
         """
     )
-    
+
     parser.add_argument(
         "--version", "-v",
         action="store_true",
         help="Show razorcore version"
     )
-    
+
     parser.add_argument(
         "--workspace", "-w",
         type=Path,
         default=None,
         help="Path to GitHub workspace (default: auto-detect)"
     )
-    
+
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
+
     # sync-configs command
     sync_parser = subparsers.add_parser(
         "sync-configs",
@@ -60,7 +62,7 @@ Examples:
         action="store_true",
         help="Show what would be done without making changes"
     )
-    
+
     # verify command
     verify_parser = subparsers.add_parser(
         "verify",
@@ -77,7 +79,7 @@ Examples:
         action="store_true",
         help="Exit with error on any warning"
     )
-    
+
     # commit-all command
     commit_parser = subparsers.add_parser(
         "commit-all",
@@ -98,14 +100,39 @@ Examples:
         action="store_true",
         help="Push after committing"
     )
-    
+
     # list command
     subparsers.add_parser(
         "list",
         aliases=["ls"],
         help="List all managed projects"
     )
-    
+
+    # bump command
+    bump_parser = subparsers.add_parser(
+        "bump",
+        help="Auto-bump version based on commit messages"
+    )
+    bump_parser.add_argument(
+        "project",
+        help="Project to bump version for"
+    )
+    bump_parser.add_argument(
+        "--dry-run", "-n",
+        action="store_true",
+        help="Show what would be done without making changes"
+    )
+
+    # build command
+    build_parser = subparsers.add_parser(
+        "build",
+        help="Build a project and create DMG"
+    )
+    build_parser.add_argument(
+        "project",
+        help="Project to build"
+    )
+
     return parser
 
 
@@ -113,12 +140,12 @@ def get_workspace(specified: Optional[Path] = None) -> Path:
     """Get the workspace path, auto-detecting if not specified."""
     if specified:
         return specified.resolve()
-    
+
     # Try to find workspace from razorcore location
     razorcore_dir = Path(__file__).parent.parent.parent.parent.parent
     if (razorcore_dir / "razorcore").exists():
         return razorcore_dir
-    
+
     # Try common locations
     home = Path.home()
     for candidate in [
@@ -129,7 +156,7 @@ def get_workspace(specified: Optional[Path] = None) -> Path:
     ]:
         if candidate.exists() and (candidate / "razorcore").exists():
             return candidate
-    
+
     # Default to current directory
     return Path.cwd()
 
@@ -138,18 +165,18 @@ def main(args: Optional[List[str]] = None) -> int:
     """Main entry point for razorcore CLI."""
     parser = create_parser()
     parsed = parser.parse_args(args)
-    
+
     if parsed.version:
         from razorcore import __version__
         print(f"razorcore {__version__}")
         return 0
-    
+
     workspace = get_workspace(parsed.workspace)
-    
+
     if not parsed.command:
         parser.print_help()
         return 0
-    
+
     # Route to command handlers
     try:
         if parsed.command in ("sync-configs", "sync"):
@@ -173,6 +200,17 @@ def main(args: Optional[List[str]] = None) -> int:
             )
         elif parsed.command in ("list", "ls"):
             return list_projects(workspace=workspace)
+        elif parsed.command == "bump":
+            return bump_version(
+                workspace=workspace,
+                project=parsed.project,
+                dry_run=parsed.dry_run
+            )
+        elif parsed.command == "build":
+            return build_project(
+                workspace=workspace,
+                project=parsed.project
+            )
         else:
             parser.print_help()
             return 1
