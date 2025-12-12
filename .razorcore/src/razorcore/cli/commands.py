@@ -21,7 +21,6 @@ MANAGED_PROJECTS = [
     "Papyrus",
     "PyPixPro",
     "iSort",
-    "LibraLog",
     ".razorcore",
     "czkawka-macos-guide",
 ]
@@ -33,7 +32,6 @@ BUILDABLE_PROJECTS = [
     "Papyrus",
     "PyPixPro",
     "iSort",
-    "LibraLog",
 ]
 
 

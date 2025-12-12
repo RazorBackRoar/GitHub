@@ -1,6 +1,6 @@
 # RazorBackRoar GitHub Workspace
 
-This workspace contains 6 macOS Python/PySide6 applications with a shared library called `.razorcore` (hidden folder).
+This workspace contains 5 macOS Python/PySide6 applications with a shared library called `.razorcore` (hidden folder).
 
 ## Workspace Structure
 
@@ -34,11 +34,8 @@ This workspace contains 6 macOS Python/PySide6 applications with a shared librar
 ├── PyPixPro/                    # Photo organization
 │   └── src/pypixpro/
 │
-├── iSort/                       # Apple device file organizer
-│   └── src/isort_app/
-│
-└── LibraLog/                    # Library manager (in development)
-    └── src/libralog/
+└── iSort/                       # Apple device file organizer
+    └── src/isort_app/
 ```
 
 ---
@@ -52,7 +49,6 @@ This workspace contains 6 macOS Python/PySide6 applications with a shared librar
 | Papyrus | `papyrus` | 1.2.0 | HTML to PDF converter |
 | PyPixPro | `pypixpro` | 1.0.0 | Photo organization |
 | iSort | `isort_app` | 10.0.0 | Apple device file organizer |
-| LibraLog | `libralog` | 1.0.0 | Library manager |
 | **.razorcore** | `razorcore` | 1.0.0 | Shared library (configs, themes, build tools) |
 
 ---
