@@ -56,7 +56,7 @@ You can verify this by running `uname -m` in your terminal: `arm64` means Apple 
 
 ---
 
-## ⬇️ Direct Download Links
+## Direct Download Links
 
 ### ⚪ 10.0.0 Stable Builds
 
