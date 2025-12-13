@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "razorcore"
-version = "1.0.3"
+version = "1.1.0"
 description = "Shared foundation library for RazorBackRoar's macOS Python applications"
 authors = [
     { name = "RazorBackRoar" }
