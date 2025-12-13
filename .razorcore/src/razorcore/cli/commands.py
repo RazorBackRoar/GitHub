@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import os
+import tempfile
 from pathlib import Path
 
 # ANSI colors
@@ -168,11 +170,15 @@ def verify(
         print(f"\n{CYAN}[{proj_name}]{NC}")
 
         # Check for pyproject.toml
+        is_doc_only = proj_name in DOC_ONLY_PROJECTS
         if (proj_dir / "pyproject.toml").exists():
             log_success("pyproject.toml exists")
         else:
-            log_error("pyproject.toml missing")
-            errors += 1
+            if is_doc_only:
+                log_info("Skipping pyproject.toml check (documentation project)")
+            else:
+                log_error("pyproject.toml missing")
+                errors += 1
 
         # Check for symlinks (should NOT exist anymore)
         for config_name in [".pylintrc", "pyrightconfig.json"]:
@@ -183,8 +189,11 @@ def verify(
             elif config_path.exists():
                 log_success(f"{config_name} is a regular file")
             else:
-                log_warning(f"{config_name} missing")
-                warnings += 1
+                if is_doc_only:
+                    log_info(f"Skipping {config_name} check (documentation project)")
+                else:
+                    log_warning(f"{config_name} missing")
+                    warnings += 1
 
         # Check for PORTFOLIO.md symlink (should NOT exist)
         portfolio_path = proj_dir / "docs" / "PORTFOLIO.md"
@@ -402,6 +411,29 @@ def bump_version(
         log_error(f"Project not found: {project}")
         return 1
 
+    git_root_result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True
+    )
+
+    if git_root_result.returncode != 0 or not git_root_result.stdout.strip():
+        log_error("Not inside a git repository")
+        return 1
+
+    repo_root = Path(git_root_result.stdout.strip()).resolve()
+    proj_dir_resolved = proj_dir.resolve()
+
+    if repo_root != proj_dir_resolved:
+        try:
+            _ = proj_dir_resolved.relative_to(repo_root).as_posix()
+        except ValueError:
+            log_error("Project is not inside the detected git repository")
+            return 1
+
+    is_nested_project = repo_root != proj_dir_resolved
+
     pyproject = proj_dir / "pyproject.toml"
     if not pyproject.exists():
         log_error("No pyproject.toml found")
@@ -524,9 +556,10 @@ def bump_version(
 
     # Auto-push commits and tags
     log_info("Pushing to remote...")
+    push_cwd = repo_root if is_nested_project else proj_dir
     push_result = subprocess.run(
         ["git", "push"],
-        cwd=proj_dir,
+        cwd=push_cwd,
         capture_output=True,
         text=True
     )
@@ -757,17 +790,87 @@ def save_project(
         log_error(f"Project not found: {project}")
         return 1
 
-    # Check for changes
-    status_result = subprocess.run(
-        ["git", "status", "--porcelain"],
+    git_root_result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
         cwd=proj_dir,
         capture_output=True,
         text=True
     )
 
+    if git_root_result.returncode != 0 or not git_root_result.stdout.strip():
+        log_error("Not inside a git repository")
+        return 1
+
+    repo_root = Path(git_root_result.stdout.strip()).resolve()
+    proj_dir_resolved = proj_dir.resolve()
+
+    is_nested_project = repo_root != proj_dir_resolved
+    project_rel = ""
+    if is_nested_project:
+        try:
+            project_rel = proj_dir_resolved.relative_to(repo_root).as_posix()
+        except ValueError:
+            log_error("Project is not inside the detected git repository")
+            return 1
+
+    # Check for changes
+    if is_nested_project:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all", "--", project_rel],
+            cwd=repo_root,
+            capture_output=True,
+            text=True
+        )
+    else:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=proj_dir,
+            capture_output=True,
+            text=True
+        )
+
     if not status_result.stdout.strip():
         log_info("No changes to commit")
         return 0
+
+    if is_nested_project:
+        all_status_result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True
+        )
+
+        if all_status_result.returncode != 0:
+            log_error("Failed to read git status")
+            return 1
+
+        outside_changes: list[str] = []
+        all_lines = all_status_result.stdout.strip().split("\n") if all_status_result.stdout.strip() else []
+        for line in all_lines:
+            if not line.strip():
+                continue
+            path_part = line[3:].strip()
+            candidates = [path_part]
+            if "->" in path_part:
+                candidates = [p.strip() for p in path_part.split("->", 1)]
+
+            in_project = True
+            for p in candidates:
+                if p != project_rel and not p.startswith(f"{project_rel}/"):
+                    in_project = False
+                    break
+
+            if not in_project:
+                outside_changes.append(path_part)
+
+        if outside_changes:
+            log_warning(
+                f"Other changes detected outside {project_rel}. "
+                f"Razorcore will commit only {project_rel} and leave the rest uncommitted."
+            )
+            for item in outside_changes[:10]:
+                log_warning(f"Outside: {item}")
 
     # Analyze changes to generate commit message
     changes = status_result.stdout.strip().split("\n")
@@ -810,9 +913,10 @@ def save_project(
             break
         elif f.endswith(".py"):
             # Check diff for clues
+            diff_cwd = repo_root if is_nested_project else proj_dir
             diff_result = subprocess.run(
-                ["git", "diff", "--cached", f, "--", f],
-                cwd=proj_dir,
+                ["git", "diff", "--", f],
+                cwd=diff_cwd,
                 capture_output=True,
                 text=True
             )
@@ -850,16 +954,65 @@ def save_project(
 
     log_info(f"Generated message: {commit_msg}")
 
-    # Stage all changes
-    subprocess.run(["git", "add", "-A"], cwd=proj_dir)
+    if is_nested_project:
+        # Use an isolated index so we never accidentally commit staged changes
+        # from other projects in the monorepo.
+        with tempfile.NamedTemporaryFile(prefix="razorcore_index_", delete=False) as tmp:
+            temp_index = tmp.name
 
-    # Commit
-    commit_result = subprocess.run(
-        ["git", "commit", "-m", commit_msg],
-        cwd=proj_dir,
-        capture_output=True,
-        text=True
-    )
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = temp_index
+
+        try:
+            subprocess.run(
+                ["git", "read-tree", "HEAD"],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True
+            )
+
+            subprocess.run(
+                ["git", "add", "-A", "--", project_rel],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True
+            )
+
+            commit_result = subprocess.run(
+                ["git", "commit", "-m", commit_msg],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True
+            )
+
+            if commit_result.returncode == 0:
+                # Keep the real index in sync with the updated HEAD without
+                # touching other staged changes outside this folder.
+                subprocess.run(
+                    ["git", "reset", "HEAD", "--", project_rel],
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True
+                )
+        finally:
+            try:
+                os.remove(temp_index)
+            except OSError:
+                pass
+    else:
+        # Stage all changes
+        subprocess.run(["git", "add", "-A"], cwd=proj_dir)
+
+        # Commit
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", commit_msg],
+            cwd=proj_dir,
+            capture_output=True,
+            text=True
+        )
 
     if commit_result.returncode != 0:
         log_error(f"Commit failed: {commit_result.stderr}")
@@ -869,9 +1022,10 @@ def save_project(
 
     # Push
     log_info("Pushing to remote...")
+    push_cwd = repo_root if is_nested_project else proj_dir
     push_result = subprocess.run(
         ["git", "push"],
-        cwd=proj_dir,
+        cwd=push_cwd,
         capture_output=True,
         text=True
     )
