@@ -61,6 +61,141 @@ def _tag_prefix(project: str) -> str:
     return project.lstrip(".")
 
 
+def _maybe_auto_save_razorcore(workspace: Path) -> int:
+    razorcore_dir = workspace / ".razorcore"
+    if not razorcore_dir.exists():
+        return 0
+
+    razorcore_status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=razorcore_dir,
+        capture_output=True,
+        text=True,
+        check=False
+    )
+    if not razorcore_status.stdout.strip():
+        return 0
+
+    log_info("Auto-saving .razorcore...")
+    return save_project(
+        workspace,
+        ".razorcore",
+        auto_bump=True,
+        auto_save_razorcore=False
+    )
+
+
+def install_hooks(workspace: Path, projects: list[str] | None = None) -> int:
+    """Install git hooks to auto-save .razorcore after commits."""
+    print(f"\n{'=' * 60}")
+    print("  Razorcore Install Hooks")
+    print(f"{'=' * 60}\n")
+
+    candidates: list[Path] = [workspace]
+    candidates.extend(get_projects(workspace, projects))
+
+    installed = 0
+    skipped = 0
+    errors = 0
+
+    hook_snippet = """
+RAZORCORE_HOOK_AUTOSAVE=1
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "$repo_root" ]; then
+  exit 0
+fi
+
+workspace="$repo_root"
+if [ ! -d "$workspace/.razorcore" ]; then
+  parent="$(dirname "$repo_root")"
+  if [ -d "$parent/.razorcore" ]; then
+    workspace="$parent"
+  else
+    exit 0
+  fi
+fi
+
+if [ ! -d "$workspace/.git" ]; then
+  exit 0
+fi
+
+hash="$(printf %s "$workspace" | shasum | awk '{print $1}' | cut -c1-12)"
+lockdir="${TMPDIR:-/tmp}/razorcore_hook_${hash}.lock"
+if ! mkdir "$lockdir" 2>/dev/null; then
+  exit 0
+fi
+trap 'rmdir "$lockdir" 2>/dev/null || true' EXIT
+
+if [ -z "$(git -C "$workspace/.razorcore" status --porcelain 2>/dev/null || true)" ]; then
+  exit 0
+fi
+
+PYTHONPATH="$workspace/.razorcore/src${PYTHONPATH:+:$PYTHONPATH}" \
+  python3 -m razorcore.cli.main --workspace "$workspace" save .razorcore || true
+"""
+
+    hook_body = f"""#!/bin/sh
+set -eu
+{hook_snippet}
+"""
+
+    for repo in candidates:
+        git_dir = repo / ".git"
+        if not git_dir.exists() or not git_dir.is_dir():
+            continue
+
+        hooks_dir = git_dir / "hooks"
+        hook_path = hooks_dir / "post-commit"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+
+        if hook_path.exists():
+            try:
+                existing = hook_path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                existing = ""
+
+            if "RAZORCORE_HOOK_AUTOSAVE=1" in existing:
+                log_info(f"Hook already installed: {repo}")
+                skipped += 1
+                continue
+
+            if "python3 -m razorcore.cli.main" in existing and "save .razorcore" in existing:
+                log_info(f"Hook already installed: {repo}")
+                skipped += 1
+                continue
+
+            if "git lfs post-commit" in existing:
+                try:
+                    hook_path.write_text(existing.rstrip() + hook_snippet, encoding="utf-8")
+                    hook_path.chmod(0o755)
+                    log_success(f"Appended Razorcore to existing hook: {repo}")
+                    installed += 1
+                except OSError as e:
+                    log_error(f"Failed to update hook in {repo}: {e}")
+                    errors += 1
+                continue
+
+            log_warning(f"Hook exists, skipping: {hook_path}")
+            skipped += 1
+            continue
+
+        try:
+            hook_path.write_text(hook_body, encoding="utf-8")
+            hook_path.chmod(0o755)
+            log_success(f"Installed post-commit hook: {repo}")
+            installed += 1
+        except OSError as e:
+            log_error(f"Failed to install hook in {repo}: {e}")
+            errors += 1
+
+    print(f"\n{'=' * 60}")
+    print(f"  Installed: {installed}, Skipped: {skipped}, Errors: {errors}")
+    print(f"{'=' * 60}\n")
+
+    return 1 if errors > 0 else 0
+
+
 def get_projects(workspace: Path, specified: list[str] | None = None) -> list[Path]:
     """Get list of project directories to operate on."""
     if specified:
@@ -437,6 +572,13 @@ def bump_version(
     proj_dir_resolved = proj_dir.resolve()
 
     is_nested_project = repo_root != proj_dir_resolved
+    project_rel = ""
+    if is_nested_project:
+        try:
+            project_rel = proj_dir_resolved.relative_to(repo_root).as_posix()
+        except ValueError:
+            log_error("Project is not inside the detected git repository")
+            return 1
 
     pyproject = proj_dir / "pyproject.toml"
     if not pyproject.exists():
@@ -457,8 +599,9 @@ def bump_version(
 
     # Get commits since last tag
     tag_prefix = _tag_prefix(project)
+    tag_match = f"{tag_prefix}-v*" if is_nested_project else "v*"
     result = subprocess.run(
-        ["git", "describe", "--tags", "--abbrev=0", "--match", f"{tag_prefix}-v*"],
+        ["git", "describe", "--tags", "--abbrev=0", "--match", tag_match],
         cwd=proj_dir,
         capture_output=True,
         text=True,
@@ -550,17 +693,70 @@ def bump_version(
             log_success(f"Updated {init_file.name}")
 
     # Git commit and tag
-    subprocess.run(["git", "add", "-A"], cwd=proj_dir, check=False)
-    subprocess.run(
-        ["git", "commit", "-m", f"chore: bump version to {new_version}"],
-        cwd=proj_dir,
-        check=False
-    )
+    tag_cwd = repo_root if is_nested_project else proj_dir
+    if is_nested_project:
+        with tempfile.NamedTemporaryFile(prefix="razorcore_index_", delete=False) as tmp:
+            temp_index = tmp.name
 
-    tag_name = f"{tag_prefix}-v{new_version}"
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = temp_index
+
+        try:
+            subprocess.run(
+                ["git", "read-tree", "HEAD"],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            subprocess.run(
+                ["git", "add", "-A", "--", project_rel],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            subprocess.run(
+                ["git", "commit", "-m", f"chore: bump version to {new_version}"],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            subprocess.run(
+                ["git", "reset", "HEAD", "--", project_rel],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+        finally:
+            try:
+                os.remove(temp_index)
+            except OSError:
+                pass
+    else:
+        subprocess.run(["git", "add", "-A"], cwd=proj_dir, check=False)
+        subprocess.run(
+            ["git", "commit", "-m", f"chore: bump version to {new_version}"],
+            cwd=proj_dir,
+            check=False
+        )
+
+    tag_name = f"{tag_prefix}-v{new_version}" if is_nested_project else f"v{new_version}"
     subprocess.run(
-        ["git", "tag", "-a", tag_name, "-m", f"Release {project} {new_version}"],
-        cwd=proj_dir,
+        [
+            "git",
+            "tag",
+            "-a",
+            tag_name,
+            "-m",
+            f"Release {project} {new_version}" if is_nested_project else f"Release {new_version}",
+        ],
+        cwd=tag_cwd,
         check=False
     )
     log_success(f"Created tag {tag_name}")
@@ -583,7 +779,7 @@ def bump_version(
 
     tags_result = subprocess.run(
         ["git", "push", "--tags"],
-        cwd=proj_dir,
+        cwd=push_cwd,
         capture_output=True,
         text=True,
         check=False
@@ -665,9 +861,31 @@ def auto_bump_version(
         return 1
 
     # Get commits since last tag
+    git_root_result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=proj_dir,
+        capture_output=True,
+        text=True,
+        check=False
+    )
+
+    if git_root_result.returncode != 0 or not git_root_result.stdout.strip():
+        return 1
+
+    repo_root = Path(git_root_result.stdout.strip()).resolve()
+    proj_dir_resolved = proj_dir.resolve()
+    is_nested_project = repo_root != proj_dir_resolved
+    project_rel = ""
+    if is_nested_project:
+        try:
+            project_rel = proj_dir_resolved.relative_to(repo_root).as_posix()
+        except ValueError:
+            return 1
+
     tag_prefix = _tag_prefix(project)
+    tag_match = f"{tag_prefix}-v*" if is_nested_project else "v*"
     result = subprocess.run(
-        ["git", "describe", "--tags", "--abbrev=0", "--match", f"{tag_prefix}-v*"],
+        ["git", "describe", "--tags", "--abbrev=0", "--match", tag_match],
         cwd=proj_dir,
         capture_output=True,
         text=True,
@@ -769,26 +987,80 @@ def auto_bump_version(
             pass  # Non-critical, continue
 
     # Git commit and tag
-    subprocess.run(["git", "add", "-A"], cwd=proj_dir, check=False)
-    subprocess.run(
-        ["git", "commit", "-m", f"chore: bump version to {new_version}"],
-        cwd=proj_dir,
-        capture_output=True,
-        check=False
-    )
+    tag_cwd = repo_root if is_nested_project else proj_dir
+    if is_nested_project:
+        with tempfile.NamedTemporaryFile(prefix="razorcore_index_", delete=False) as tmp:
+            temp_index = tmp.name
 
-    tag_name = f"{tag_prefix}-v{new_version}"
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = temp_index
+
+        try:
+            subprocess.run(
+                ["git", "read-tree", "HEAD"],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            subprocess.run(
+                ["git", "add", "-A", "--", project_rel],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            subprocess.run(
+                ["git", "commit", "-m", f"chore: bump version to {new_version}"],
+                cwd=repo_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            subprocess.run(
+                ["git", "reset", "HEAD", "--", project_rel],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+        finally:
+            try:
+                os.remove(temp_index)
+            except OSError:
+                pass
+    else:
+        subprocess.run(["git", "add", "-A"], cwd=proj_dir, check=False)
+        subprocess.run(
+            ["git", "commit", "-m", f"chore: bump version to {new_version}"],
+            cwd=proj_dir,
+            capture_output=True,
+            check=False
+        )
+
+    tag_name = f"{tag_prefix}-v{new_version}" if is_nested_project else f"v{new_version}"
     subprocess.run(
-        ["git", "tag", "-a", tag_name, "-m", f"Release {project} {new_version}"],
-        cwd=proj_dir,
+        [
+            "git",
+            "tag",
+            "-a",
+            tag_name,
+            "-m",
+            f"Release {project} {new_version}" if is_nested_project else f"Release {new_version}",
+        ],
+        cwd=tag_cwd,
         capture_output=True,
         check=False
     )
     log_success(f"Created tag {tag_name}")
 
     # Push commits and tags
-    subprocess.run(["git", "push"], cwd=proj_dir, capture_output=True, check=False)
-    subprocess.run(["git", "push", "--tags"], cwd=proj_dir, capture_output=True, check=False)
+    push_cwd = repo_root if is_nested_project else proj_dir
+    subprocess.run(["git", "push"], cwd=push_cwd, capture_output=True, check=False)
+    subprocess.run(["git", "push", "--tags"], cwd=push_cwd, capture_output=True, check=False)
     log_success("Pushed version bump and tags")
 
     return 0
@@ -797,7 +1069,8 @@ def auto_bump_version(
 def save_project(
     workspace: Path,
     project: str,
-    auto_bump: bool = True
+    auto_bump: bool = True,
+    auto_save_razorcore: bool = True
 ) -> int:
     """Auto-generate commit message, commit, push, and auto-bump version."""
     print(f"\n{'=' * 60}")
@@ -853,6 +1126,11 @@ def save_project(
 
     if not status_result.stdout.strip():
         log_info("No changes to commit")
+        if auto_save_razorcore and project != ".razorcore":
+            razorcore_save_result = _maybe_auto_save_razorcore(workspace)
+            if razorcore_save_result != 0:
+                log_warning("Auto-save .razorcore failed")
+                return 1
         return 0
 
     if is_nested_project:
@@ -1078,6 +1356,11 @@ def save_project(
         if bump_result != 0:
             log_warning("Version bump skipped (no commits since last tag or error)")
 
+    if auto_save_razorcore and project != ".razorcore":
+        razorcore_save_result = _maybe_auto_save_razorcore(workspace)
+        if razorcore_save_result != 0:
+            log_warning("Auto-save .razorcore failed")
+
     print(f"\n{'=' * 60}")
     print(f"  {GREEN}✓ Saved and pushed!{NC}")
     print(f"{'=' * 60}\n")
@@ -1114,7 +1397,7 @@ def save_all(workspace: Path) -> int:
             continue
 
         print(f"\n{CYAN}[{name}]{NC}")
-        result = save_project(workspace, name)
+        result = save_project(workspace, name, auto_save_razorcore=False)
         if result == 0:
             saved += 1
         else:

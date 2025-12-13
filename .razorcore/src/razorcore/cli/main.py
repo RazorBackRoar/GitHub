@@ -14,6 +14,7 @@ from .commands import (
     build_project,
     bump_version,
     commit_all,
+    install_hooks,
     list_projects,
     save_all,
     save_project,
@@ -144,6 +145,18 @@ Examples:
         help="Project to build"
     )
 
+    # install-hooks command
+    hooks_parser = subparsers.add_parser(
+        "install-hooks",
+        aliases=["hooks"],
+        help="Install git hooks to auto-save .razorcore after commits"
+    )
+    hooks_parser.add_argument(
+        "projects",
+        nargs="*",
+        help="Specific projects to install hooks for (default: all)"
+    )
+
     # save command
     save_parser = subparsers.add_parser(
         "save",
@@ -232,6 +245,11 @@ def main(args: Optional[List[str]] = None) -> int:
             return build_project(
                 workspace=workspace,
                 project=parsed.project
+            )
+        elif parsed.command in ("install-hooks", "hooks"):
+            return install_hooks(
+                workspace=workspace,
+                projects=parsed.projects or None
             )
         elif parsed.command == "save":
             if parsed.project:
