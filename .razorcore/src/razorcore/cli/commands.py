@@ -3,6 +3,8 @@ Razorcore CLI Commands Implementation.
 """
 from __future__ import annotations
 
+ # pylint: disable=too-many-lines,missing-function-docstring,import-outside-toplevel
+
 import shutil
 import subprocess
 import os
@@ -206,7 +208,7 @@ def verify(
         # Check for .dev-tools references
         gitignore = proj_dir / ".gitignore"
         if gitignore.exists():
-            content = gitignore.read_text()
+            content = gitignore.read_text(encoding="utf-8")
             if ".dev-tools" in content:
                 log_warning(".gitignore still references .dev-tools")
                 warnings += 1
@@ -294,7 +296,8 @@ def commit_all(
             ["git", "status", "--porcelain"],
             cwd=proj_dir,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
         if not result.stdout.strip():
@@ -310,7 +313,8 @@ def commit_all(
             ["git", "commit", "-m", message],
             cwd=proj_dir,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
         if commit_result.returncode == 0:
@@ -323,7 +327,8 @@ def commit_all(
                     ["git", "push"],
                     cwd=proj_dir,
                     capture_output=True,
-                    text=True
+                    text=True,
+                    check=False
                 )
                 if push_result.returncode == 0:
                     log_success("Pushed to remote")
@@ -373,7 +378,7 @@ def list_projects(workspace: Path) -> int:
                 with open(pyproject, "rb") as f:
                     data = tomllib.load(f)
                     version = data.get("project", {}).get("version", "n/a")
-            except Exception:
+            except (OSError, ValueError, ImportError):
                 pass
 
         # Check git status
@@ -383,7 +388,8 @@ def list_projects(workspace: Path) -> int:
                 ["git", "status", "--porcelain"],
                 cwd=proj_dir,
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
             if result.stdout.strip():
                 git_status = f" {YELLOW}(uncommitted changes){NC}"
@@ -415,7 +421,8 @@ def bump_version(
         ["git", "rev-parse", "--show-toplevel"],
         cwd=proj_dir,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
 
     if git_root_result.returncode != 0 or not git_root_result.stdout.strip():
@@ -424,13 +431,6 @@ def bump_version(
 
     repo_root = Path(git_root_result.stdout.strip()).resolve()
     proj_dir_resolved = proj_dir.resolve()
-
-    if repo_root != proj_dir_resolved:
-        try:
-            _ = proj_dir_resolved.relative_to(repo_root).as_posix()
-        except ValueError:
-            log_error("Project is not inside the detected git repository")
-            return 1
 
     is_nested_project = repo_root != proj_dir_resolved
 
@@ -445,7 +445,7 @@ def bump_version(
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
             current_version = data.get("project", {}).get("version", "0.0.0")
-    except Exception as e:
+    except (OSError, ValueError, ImportError) as e:
         log_error(f"Failed to read version: {e}")
         return 1
 
@@ -456,7 +456,8 @@ def bump_version(
         ["git", "describe", "--tags", "--abbrev=0"],
         cwd=proj_dir,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
 
     if result.returncode == 0:
@@ -472,7 +473,8 @@ def bump_version(
         ["git", "log", commit_range, "--pretty=format:%s"],
         cwd=proj_dir,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
 
     commits = result.stdout.strip().split("\n") if result.stdout.strip() else []
@@ -523,34 +525,36 @@ def bump_version(
         return 0
 
     # Update pyproject.toml
-    content = pyproject.read_text()
+    content = pyproject.read_text(encoding="utf-8")
     updated = content.replace(
         f'version = "{current_version}"',
         f'version = "{new_version}"'
     )
-    pyproject.write_text(updated)
+    pyproject.write_text(updated, encoding="utf-8")
     log_success(f"Updated pyproject.toml to {new_version}")
 
     # Also update __init__.py if it has __version__
     for init_file in proj_dir.glob("src/*/__init__.py"):
-        init_content = init_file.read_text()
+        init_content = init_file.read_text(encoding="utf-8")
         if "__version__" in init_content:
             updated_init = init_content.replace(
                 f'__version__ = "{current_version}"',
                 f'__version__ = "{new_version}"'
             )
-            init_file.write_text(updated_init)
+            init_file.write_text(updated_init, encoding="utf-8")
             log_success(f"Updated {init_file.name}")
 
     # Git commit and tag
-    subprocess.run(["git", "add", "-A"], cwd=proj_dir)
+    subprocess.run(["git", "add", "-A"], cwd=proj_dir, check=False)
     subprocess.run(
         ["git", "commit", "-m", f"chore: bump version to {new_version}"],
-        cwd=proj_dir
+        cwd=proj_dir,
+        check=False
     )
     subprocess.run(
         ["git", "tag", "-a", f"v{new_version}", "-m", f"Release {new_version}"],
-        cwd=proj_dir
+        cwd=proj_dir,
+        check=False
     )
     log_success(f"Created tag v{new_version}")
 
@@ -561,7 +565,8 @@ def bump_version(
         ["git", "push"],
         cwd=push_cwd,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
     if push_result.returncode == 0:
         log_success("Pushed commits")
@@ -573,7 +578,8 @@ def bump_version(
         ["git", "push", "--tags"],
         cwd=proj_dir,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
     if tags_result.returncode == 0:
         log_success("Pushed tags")
@@ -591,7 +597,7 @@ def bump_version(
 def build_project(
     workspace: Path,
     project: str,
-    create_dmg: bool = True
+    _create_dmg: bool = True
 ) -> int:
     """Build a project using universal-build.sh."""
     print(f"\n{'=' * 60}")
@@ -620,7 +626,8 @@ def build_project(
 
     result = subprocess.run(
         [str(build_script), project],
-        cwd=razorcore_dir
+        cwd=razorcore_dir,
+        check=False
     )
 
     return result.returncode
@@ -647,7 +654,7 @@ def auto_bump_version(
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
             current_version = data.get("project", {}).get("version", "0.0.0")
-    except Exception:
+    except (OSError, ValueError, ImportError):
         return 1
 
     # Get commits since last tag
@@ -655,7 +662,8 @@ def auto_bump_version(
         ["git", "describe", "--tags", "--abbrev=0"],
         cwd=proj_dir,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
 
     if result.returncode == 0:
@@ -671,14 +679,16 @@ def auto_bump_version(
             ["git", "log", "-1", "--pretty=format:%s"],
             cwd=proj_dir,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
     else:
         result = subprocess.run(
             ["git", "log", commit_range, "--pretty=format:%s"],
             cwd=proj_dir,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
     commits = result.stdout.strip().split("\n") if result.stdout.strip() else []
@@ -703,10 +713,7 @@ def auto_bump_version(
     if len(parts) != 3:
         return 1
 
-    try:
-        major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
-    except ValueError:
-        return 1
+    major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
 
     if bump_type == "major":
         major += 1
@@ -723,53 +730,55 @@ def auto_bump_version(
     log_info(f"Version: {current_version} → {new_version} ({bump_type})")
 
     # Update pyproject.toml
-    content = pyproject.read_text()
+    content = pyproject.read_text(encoding="utf-8")
     updated = content.replace(
         f'version = "{current_version}"',
         f'version = "{new_version}"'
     )
-    pyproject.write_text(updated)
+    pyproject.write_text(updated, encoding="utf-8")
 
     # Also update __init__.py if it has __version__
     for init_file in proj_dir.glob("src/*/__init__.py"):
-        init_content = init_file.read_text()
+        init_content = init_file.read_text(encoding="utf-8")
         if "__version__" in init_content:
             updated_init = init_content.replace(
                 f'__version__ = "{current_version}"',
                 f'__version__ = "{new_version}"'
             )
-            init_file.write_text(updated_init)
+            init_file.write_text(updated_init, encoding="utf-8")
 
     # Also update dmg-config.json if it exists
     dmg_config = proj_dir / "build" / "dmg-config.json"
     if dmg_config.exists():
         import json
         try:
-            with open(dmg_config, "r") as f:
+            with open(dmg_config, "r", encoding="utf-8") as f:
                 dmg_data = json.load(f)
             dmg_data["version"] = new_version
-            with open(dmg_config, "w") as f:
+            with open(dmg_config, "w", encoding="utf-8") as f:
                 json.dump(dmg_data, f, indent=2)
-        except Exception:
+        except (OSError, ValueError):
             pass  # Non-critical, continue
 
     # Git commit and tag
-    subprocess.run(["git", "add", "-A"], cwd=proj_dir)
+    subprocess.run(["git", "add", "-A"], cwd=proj_dir, check=False)
     subprocess.run(
         ["git", "commit", "-m", f"chore: bump version to {new_version}"],
         cwd=proj_dir,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     subprocess.run(
         ["git", "tag", "-a", f"v{new_version}", "-m", f"Release {new_version}"],
         cwd=proj_dir,
-        capture_output=True
+        capture_output=True,
+        check=False
     )
     log_success(f"Created tag v{new_version}")
 
     # Push commits and tags
-    subprocess.run(["git", "push"], cwd=proj_dir, capture_output=True)
-    subprocess.run(["git", "push", "--tags"], cwd=proj_dir, capture_output=True)
+    subprocess.run(["git", "push"], cwd=proj_dir, capture_output=True, check=False)
+    subprocess.run(["git", "push", "--tags"], cwd=proj_dir, capture_output=True, check=False)
     log_success("Pushed version bump and tags")
 
     return 0
@@ -794,7 +803,8 @@ def save_project(
         ["git", "rev-parse", "--show-toplevel"],
         cwd=proj_dir,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
 
     if git_root_result.returncode != 0 or not git_root_result.stdout.strip():
@@ -819,14 +829,16 @@ def save_project(
             ["git", "status", "--porcelain", "--untracked-files=all", "--", project_rel],
             cwd=repo_root,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
     else:
         status_result = subprocess.run(
             ["git", "status", "--porcelain"],
             cwd=proj_dir,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
     if not status_result.stdout.strip():
@@ -838,7 +850,8 @@ def save_project(
             ["git", "status", "--porcelain", "--untracked-files=all"],
             cwd=repo_root,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
         if all_status_result.returncode != 0:
@@ -846,7 +859,11 @@ def save_project(
             return 1
 
         outside_changes: list[str] = []
-        all_lines = all_status_result.stdout.strip().split("\n") if all_status_result.stdout.strip() else []
+        all_lines = (
+            all_status_result.stdout.strip().split("\n")
+            if all_status_result.stdout.strip()
+            else []
+        )
         for line in all_lines:
             if not line.strip():
                 continue
@@ -918,7 +935,8 @@ def save_project(
                 ["git", "diff", "--", f],
                 cwd=diff_cwd,
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
             diff_text = diff_result.stdout.lower()
             if "def " in diff_text and "+" in diff_text:
@@ -969,7 +987,8 @@ def save_project(
                 cwd=repo_root,
                 env=env,
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
 
             subprocess.run(
@@ -977,7 +996,8 @@ def save_project(
                 cwd=repo_root,
                 env=env,
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
 
             commit_result = subprocess.run(
@@ -985,7 +1005,8 @@ def save_project(
                 cwd=repo_root,
                 env=env,
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
 
             if commit_result.returncode == 0:
@@ -995,7 +1016,8 @@ def save_project(
                     ["git", "reset", "HEAD", "--", project_rel],
                     cwd=repo_root,
                     capture_output=True,
-                    text=True
+                    text=True,
+                    check=False
                 )
         finally:
             try:
@@ -1004,14 +1026,15 @@ def save_project(
                 pass
     else:
         # Stage all changes
-        subprocess.run(["git", "add", "-A"], cwd=proj_dir)
+        subprocess.run(["git", "add", "-A"], cwd=proj_dir, check=False)
 
         # Commit
         commit_result = subprocess.run(
             ["git", "commit", "-m", commit_msg],
             cwd=proj_dir,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
     if commit_result.returncode != 0:
@@ -1027,7 +1050,8 @@ def save_project(
         ["git", "push"],
         cwd=push_cwd,
         capture_output=True,
-        text=True
+        text=True,
+        check=False
     )
 
     if push_result.returncode == 0:
@@ -1071,7 +1095,8 @@ def save_all(workspace: Path) -> int:
             ["git", "status", "--porcelain"],
             cwd=proj_dir,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
         if not status_result.stdout.strip():
