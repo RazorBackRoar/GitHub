@@ -22,7 +22,6 @@ MANAGED_PROJECTS = [
     "PyPixPro",
     "iSort",
     ".razorcore",
-    "czkawka-macos-guide",
 ]
 
 # Projects that can be built into apps (excludes documentation and library projects)
@@ -169,11 +168,8 @@ def verify(
         if (proj_dir / "pyproject.toml").exists():
             log_success("pyproject.toml exists")
         else:
-            if proj_name != "czkawka-macos-guide":
-                log_error("pyproject.toml missing")
-                errors += 1
-            else:
-                log_info("Skipping pyproject.toml check (documentation project)")
+            log_error("pyproject.toml missing")
+            errors += 1
 
         # Check for symlinks (should NOT exist anymore)
         for config_name in [".pylintrc", "pyrightconfig.json"]:
@@ -184,9 +180,8 @@ def verify(
             elif config_path.exists():
                 log_success(f"{config_name} is a regular file")
             else:
-                if proj_name != "czkawka-macos-guide":
-                    log_warning(f"{config_name} missing")
-                    warnings += 1
+                log_warning(f"{config_name} missing")
+                warnings += 1
 
         # Check for PORTFOLIO.md symlink (should NOT exist)
         portfolio_path = proj_dir / "docs" / "PORTFOLIO.md"
