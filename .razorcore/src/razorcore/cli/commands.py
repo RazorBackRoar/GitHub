@@ -21,6 +21,7 @@ MANAGED_PROJECTS = [
     "Papyrus",
     "PyPixPro",
     "iSort",
+    "czkawka-macos-guide",
     ".razorcore",
 ]
 
@@ -32,6 +33,8 @@ BUILDABLE_PROJECTS = [
     "PyPixPro",
     "iSort",
 ]
+
+DOC_ONLY_PROJECTS = {"czkawka-macos-guide"}
 
 
 def log_success(msg: str) -> None:
