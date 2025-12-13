@@ -57,6 +57,10 @@ def log_info(msg: str) -> None:
     print(f"{CYAN}→{NC} {msg}")
 
 
+def _tag_prefix(project: str) -> str:
+    return project.lstrip(".")
+
+
 def get_projects(workspace: Path, specified: list[str] | None = None) -> list[Path]:
     """Get list of project directories to operate on."""
     if specified:
@@ -452,8 +456,9 @@ def bump_version(
     log_info(f"Current version: {current_version}")
 
     # Get commits since last tag
+    tag_prefix = _tag_prefix(project)
     result = subprocess.run(
-        ["git", "describe", "--tags", "--abbrev=0"],
+        ["git", "describe", "--tags", "--abbrev=0", "--match", f"{tag_prefix}-v*"],
         cwd=proj_dir,
         capture_output=True,
         text=True,
@@ -465,8 +470,8 @@ def bump_version(
         log_info(f"Last tag: {last_tag}")
         commit_range = f"{last_tag}..HEAD"
     else:
-        log_info("No previous tags found, analyzing all commits")
-        commit_range = "HEAD"
+        log_info(f"No previous tags found for {project}, analyzing last commit")
+        commit_range = "-1"
 
     # Get commit messages
     result = subprocess.run(
@@ -551,12 +556,14 @@ def bump_version(
         cwd=proj_dir,
         check=False
     )
+
+    tag_name = f"{tag_prefix}-v{new_version}"
     subprocess.run(
-        ["git", "tag", "-a", f"v{new_version}", "-m", f"Release {new_version}"],
+        ["git", "tag", "-a", tag_name, "-m", f"Release {project} {new_version}"],
         cwd=proj_dir,
         check=False
     )
-    log_success(f"Created tag v{new_version}")
+    log_success(f"Created tag {tag_name}")
 
     # Auto-push commits and tags
     log_info("Pushing to remote...")
@@ -658,8 +665,9 @@ def auto_bump_version(
         return 1
 
     # Get commits since last tag
+    tag_prefix = _tag_prefix(project)
     result = subprocess.run(
-        ["git", "describe", "--tags", "--abbrev=0"],
+        ["git", "describe", "--tags", "--abbrev=0", "--match", f"{tag_prefix}-v*"],
         cwd=proj_dir,
         capture_output=True,
         text=True,
@@ -768,13 +776,15 @@ def auto_bump_version(
         capture_output=True,
         check=False
     )
+
+    tag_name = f"{tag_prefix}-v{new_version}"
     subprocess.run(
-        ["git", "tag", "-a", f"v{new_version}", "-m", f"Release {new_version}"],
+        ["git", "tag", "-a", tag_name, "-m", f"Release {project} {new_version}"],
         cwd=proj_dir,
         capture_output=True,
         check=False
     )
-    log_success(f"Created tag v{new_version}")
+    log_success(f"Created tag {tag_name}")
 
     # Push commits and tags
     subprocess.run(["git", "push"], cwd=proj_dir, capture_output=True, check=False)
